@@ -23,6 +23,7 @@ namespace TinyLog
     ///     5、日志路径和日志名称支持简单动态配置
     ///     6、日志组件内部错误将以innerFatal方式也写入日志中
     ///     7、日志存在开关IsOn，可以动态开关日志
+    ///     8、增加内部异常关闭自动关闭机制
     /// </summary>
     public class TinyLog
     {
@@ -31,6 +32,11 @@ namespace TinyLog
         private static string formatString = "[时间：{0}级别：{1} 日志内容]：{2}";
 
         private static StringBuilder sb = new StringBuilder();
+
+        /// <summary>
+        /// 查看缓存中的日志内容
+        /// </summary>
+        public static string LogContent { get { return sb.ToString(); } }
 
         private static object lockObj = new object();
 
@@ -58,6 +64,12 @@ namespace TinyLog
 
         //文件最大大小 最大10M
         private static long fileMaxLength = 10485760;
+
+        //内部错误次数，默认为3，超过该次数，日志自动降级
+        private static int errorRetry = 3;
+
+        //错误次数
+        private static int errorCount = 0;
 
         static TinyLog()
         {
@@ -140,21 +152,25 @@ namespace TinyLog
         {
             while (true)
             {
-                try
+                if (IsOn || sb.Length > 0)
                 {
-                    if (nextRunTime.HasValue == false)
+                    try
                     {
-                        nextRunTime = DateTime.Now.AddMilliseconds(refreshInternal);
+                        if (nextRunTime.HasValue == false)
+                        {
+                            nextRunTime = DateTime.Now.AddMilliseconds(refreshInternal);
+                        }
+                        if (DateTime.Now > nextRunTime)
+                        {
+                            FileSave();
+                            nextRunTime = DateTime.Now.AddMilliseconds(refreshInternal);
+                        }
                     }
-                    if (DateTime.Now > nextRunTime)
+                    catch (Exception ex)
                     {
-                        FileSave();
-                        nextRunTime = DateTime.Now.AddMilliseconds(refreshInternal);
+                        InnerWrite("innerFatal", "日志数据写入到文件错误:" + ex.ToString());
+                        innerError();
                     }
-                }
-                catch (Exception ex)
-                {
-                    InnerWrite("innerFatal", "日志数据写入到文件错误:" + ex.ToString());
                 }
                 Thread.Sleep(unitInternal);
             }
@@ -218,6 +234,20 @@ namespace TinyLog
                 File.WriteAllText(filePath, strSb, Encoding.UTF8);
             }
 
+        }
+
+        /// <summary>
+        /// 内部错误
+        /// </summary>
+        private static void innerError()
+        {
+            errorCount++;
+            if (errorCount > errorRetry)
+            {
+                InnerWrite("innerFatal", "内部出错次数为" +errorCount + " 并已经重置");
+                IsOn = false;
+                errorCount = 0;
+            }
         }
 
     }
