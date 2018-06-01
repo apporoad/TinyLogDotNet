@@ -39,6 +39,8 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Gzip.cs" />
+    <Compile Include="ICompress.cs" />
     <Compile Include="IDLog.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="TinyLog.cs" />
