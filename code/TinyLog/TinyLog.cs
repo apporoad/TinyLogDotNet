@@ -26,9 +26,8 @@ namespace TinyLog
     ///     8、增加内部异常关闭自动关闭机制
     ///     9、日志增加归档archive功能，默认归档目录最大大小为100M
     /// </summary>
-    public class TinyLog
+    public class TinyLog : IDLog
     {
-
         private static bool? isOn;
         /// <summary>
         /// 是否停掉记录日志
@@ -396,7 +395,7 @@ namespace TinyLog
         //是否开启归档
         public bool isAchiveOn = true;
 
-        //刷新间隔
+        //刷新间隔 1分钟刷一次
         public int refreshInternal = 60000;
 
         //最快落文件间隔
@@ -412,7 +411,7 @@ namespace TinyLog
         public string logFileName = "default.log";
 
         //日志路径
-        public string logPath = "logs";
+        public string logPath = "TinyLogs";
 
         //文件最大大小 最大10M
         public long fileMaxLength = 10485760;
