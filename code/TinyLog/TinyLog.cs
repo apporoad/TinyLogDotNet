@@ -163,7 +163,7 @@ namespace TinyLog
         {
             while (true)
             {
-                if (IsOn || sb.Length > 0)
+                if (IsOn && sb.Length > 0)
                 {
                     try
                     {
@@ -215,6 +215,7 @@ namespace TinyLog
                     {
                         File.Delete(filePath + ".old");
                     }
+                    fi.MoveTo(filePath + ".old");
                     if (IsArchiveOn)
                     {
                         var athread = new Thread(new ThreadStart(achive));
@@ -222,9 +223,6 @@ namespace TinyLog
                         athread.IsBackground = true;
                         athread.Start();
                     }
-                    fi.MoveTo(filePath + ".old");
-                    //进行归档
-                    achive();
                     //重新写入到文件
                     lock (lockObj)
                     {
