@@ -10,6 +10,13 @@ namespace Test
     {
         static void Main(string[] args)
         {
+            TestThread();
+
+        }
+
+
+        static void Test()
+        {
             var log = new TinyLog.TinyLog();
             log.Init("a.log", "");
             for (int i = 0; i < 100000000; i++)
@@ -21,7 +28,28 @@ namespace Test
                 log.Fatal("【" + i + "】aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
                 Thread.Sleep(10);
             }
+        }
 
+        static TinyLog.TinyLog tl = null;
+
+        static void TestThread()
+        {
+            tl = new TinyLog.TinyLog();
+            tl.Init("b.log", "");
+            for (int i = 0; i < 10; i++)
+            {
+                new Thread(new ParameterizedThreadStart(Run)).Start(i);
+            }
+
+        }
+
+        static void Run(object obj)
+        {
+            for (int i = 0; i < 100000000; i++)
+            {
+                tl.Debug("线程" + obj + "执行第" + i + "次sdddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd");
+                Thread.Sleep(10);
+            }
         }
     }
 }
