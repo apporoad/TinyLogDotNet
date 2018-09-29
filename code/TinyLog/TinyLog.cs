@@ -28,6 +28,8 @@ namespace TinyLog
     /// </summary>
     public class TinyLog : IDLog
     {
+        private static Thread mainThread = Thread.CurrentThread;
+
         private static bool? isOn;
         /// <summary>
         /// 是否停掉记录日志
@@ -38,7 +40,7 @@ namespace TinyLog
             {
                 if (isOn.HasValue == false)
                 {
-                    isOn = config.isOn;
+                    isOn = globalConfig.isOn;
                 }
                 return isOn.Value;
             }
@@ -58,7 +60,7 @@ namespace TinyLog
             {
                 if (isArchiveOn.HasValue == false)
                 {
-                    isArchiveOn = config.isAchiveOn;
+                    isArchiveOn = globalConfig.isAchiveOn;
                 }
                 return isArchiveOn.Value;
             }
@@ -69,20 +71,22 @@ namespace TinyLog
             }
         }
 
-        private static StringBuilder sb = new StringBuilder();
+        private StringBuilder sb = new StringBuilder();
 
         /// <summary>
         /// 查看缓存中的日志内容
         /// </summary>
-        public static string LogContent { get { return sb.ToString(); } }
+        public string LogContent { get { return sb.ToString(); } }
 
-        private static object lockObj = new object();
+        private object lockObj = new object();
 
-        private static Thread thread;
+        private Thread thread;
 
-        private static DateTime? nextRunTime = null;
+        private DateTime? nextRunTime = null;
 
-        private static TinyLogConfig config = new TinyLogConfig();
+        private static TinyLogConfig globalConfig = new TinyLogConfig();
+
+        private TinyLogConfig config = new TinyLogConfig();
 
 
         //错误次数
@@ -90,11 +94,37 @@ namespace TinyLog
 
         private static int archiveErrorCount = 0;
 
-        static TinyLog()
+        private string logID;
+
+        //随机因子
+        private static int factor = 100;
+
+        /// <summary>
+        /// 日志对象ID
+        /// </summary>
+        private string LogID
+        {
+            get
+            {
+                if (logID == null)
+                    logID = DateTime.Now.ToString("yyyyMMddhhmmssfff" + new Random(DateTime.Now.Millisecond + factor++).Next(100, 999));
+                return logID;
+            }
+        }
+
+        public TinyLog()
         {
             //变更区域 初始化10000
             sb = new StringBuilder(10000);
         }
+
+        private static TinyLog _log = new TinyLog();
+
+        /// <summary>
+        /// 获取单例日志对象
+        /// </summary>
+        /// <returns></returns>
+        public static TinyLog GetInstance() { return _log; }
 
         public void Init(string logName, string logFolderName)
         {
@@ -128,17 +158,17 @@ namespace TinyLog
             InnerWrite("WARN", strInfo ?? "");
         }
 
-        private static void InnerWrite(string head, string info)
+        private void InnerWrite(string head, string info)
         {
             //日志关闭时，不写入日志
             if (!IsOn)
                 return;
             lock (lockObj)
             {
-                if (sb.Length < config.cacheLogMaxLength)
+                if (sb.Length < globalConfig.cacheLogMaxLength)
                 {
-                    sb.AppendLine(string.Format(config.formatString, DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), head, info));
-                    if (sb.Length > config.cacheLogLength)
+                    sb.AppendLine("LogId:[" +LogID + "]" +string.Format(globalConfig.formatString, DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), head, info));
+                    if (sb.Length > globalConfig.cacheLogLength)
                     {
                         nextRunTime = DateTime.Now;
                     }
@@ -153,13 +183,13 @@ namespace TinyLog
                 {
                     thread = new Thread(new ThreadStart(writeSb2File));
                     //设置为后台线程
-                    thread.IsBackground = true;
+                    thread.IsBackground = false;
                     thread.Start();
                 }
             }
         }
 
-        private static void writeSb2File()
+        private void writeSb2File()
         {
             while (true)
             {
@@ -169,12 +199,12 @@ namespace TinyLog
                     {
                         if (nextRunTime.HasValue == false)
                         {
-                            nextRunTime = DateTime.Now.AddMilliseconds(config.refreshInternal);
+                            nextRunTime = DateTime.Now.AddMilliseconds(globalConfig.refreshInternal);
                         }
                         if (DateTime.Now > nextRunTime)
                         {
                             FileSave();
-                            nextRunTime = DateTime.Now.AddMilliseconds(config.refreshInternal);
+                            nextRunTime = DateTime.Now.AddMilliseconds(globalConfig.refreshInternal);
                         }
                     }
                     catch (Exception ex)
@@ -183,11 +213,17 @@ namespace TinyLog
                         innerError();
                     }
                 }
-                Thread.Sleep(config.unitInternal);
+                //Console.WriteLine(mainThread.IsAlive);
+                if (!mainThread.IsAlive)
+                {
+                    FileSave();
+                    break;
+                }
+                Thread.Sleep(globalConfig.unitInternal);
             }
         }
 
-        private static void FileSave()
+        private void FileSave()
         {
             string filePath = null;
             var strSb = "";
@@ -209,7 +245,7 @@ namespace TinyLog
             {
                 //判断旧文件大小，如果超过就存放到.old中
                 FileInfo fi = new FileInfo(filePath);
-                if (fi.Length > config.fileMaxLength)
+                if (fi.Length > globalConfig.fileMaxLength)
                 {
                     if (File.Exists(filePath + ".old"))
                     {
@@ -257,7 +293,7 @@ namespace TinyLog
         /// <summary>
         /// 归档方法
         /// </summary>
-        private static void achive()
+        private void achive()
         {
             if (IsArchiveOn)
             {
@@ -303,10 +339,10 @@ namespace TinyLog
         /// <summary>
         /// 内部错误
         /// </summary>
-        private static void innerError()
+        private void innerError()
         {
             errorCount++;
-            if (errorCount > config.errorRetry)
+            if (errorCount > globalConfig.errorRetry)
             {
                 InnerWrite("innerFatal", "内部出错次数为" + errorCount + " 并已经重置");
                 IsOn = false;
@@ -317,10 +353,10 @@ namespace TinyLog
         /// <summary>
         /// 归档的内部错误处理
         /// </summary>
-        private static void innerAchiveError()
+        private void innerAchiveError()
         {
             archiveErrorCount++;
-            if (archiveErrorCount > config.errorRetry)
+            if (archiveErrorCount > globalConfig.errorRetry)
             {
                 InnerWrite("innerFatal", "归档内部出错次数为" + archiveErrorCount + " 并已经重置");
                 IsArchiveOn = false;

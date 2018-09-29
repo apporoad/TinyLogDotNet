@@ -11,6 +11,8 @@ namespace Test
         static void Main(string[] args)
         {
             TestThread();
+            Test();
+            
 
         }
 

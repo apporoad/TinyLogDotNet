@@ -19,3 +19,16 @@
 	7. 日志存在开关IsOn，可以动态开关日志
 	8. 增加内部异常关闭自动关闭机制
 	9. 日志增加归档archive功能，默认归档目录最大大小为100M
+# how to use
+
+```c#
+var log = new TinyLog.TinyLog();
+log.Init("a.log", "");
+
+log.Debug("debug");
+log.Info("info");
+log.Warn("warn");
+log.Error("error");
+log.Fatal("fatal");
+
+```
