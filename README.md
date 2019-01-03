@@ -2,7 +2,7 @@
 tinyLog in c#
 
 # 中文见
-	[参见](https://github.com/apporoad/TinyLogDotNet/blob/master/README_CN.md "detail")
+[参见](https://github.com/apporoad/TinyLogDotNet/blob/master/README_CN.md "detail")
 
 # use case:
 	component in any program  
