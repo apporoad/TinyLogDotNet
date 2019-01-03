@@ -12,8 +12,8 @@ namespace Test
         {
             //TestThread();
             //Test();
-            //TestMulti();
-            TestEasyUse();
+            TestMulti();
+            //TestEasyUse();
         }
 
         static void TestEasyUse() {
@@ -68,7 +68,7 @@ namespace Test
         static void mutlti(object obj) {
             var logName = "test" + obj + ".log";
             var log = new TinyLog.TinyLog();
-            log.Init(logName, "");
+            log.Init(logName, "TinyLogs/abc");
             for (int i = 0; i < 1000000; i++)
             {
                 log.Debug(logName + "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd");
