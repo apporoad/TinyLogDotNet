@@ -1,21 +1,85 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
+using System.IO.Compression;
 using System.Text;
 using System.Threading;
 
 namespace TinyLog
 {
+    #region edit region 编辑区域
     /// <summary>
-    /// 微型日志：
-    /// 适用场景：
-    ///     底层组件
-    ///     简单小项目
-    ///     不想用大的日志框架的测试场景
+    ///  日志配置类，外部修改配置，请在这里扩展
+    ///  log config , you can edit here 
+    /// </summary>
+    internal class TinyLogConfig
+    {
+        //是否开启日志
+        // is on log
+        public bool isOn = true;
+
+        //是否开启归档
+        public bool isAchiveOn = true;
+
+        //刷新间隔 10秒刷一次
+        // internal of refresh , it controls how fast your log down to your file
+        public int refreshInternal = 10000;
+
+        //最快落文件间隔
+        // fastest internal of memory to file
+        public int unitInternal = 2000;
+
+        //日志缓存建议长度 64KB×2
+        // memory cache suggested length ,if memory size > it , it should write to file ,but it depends on unitInternal
+        public int cacheLogLength = 65536;
+
+        //最大缓存大小，大于这个不在记录
+        //max memory cache length,  if memory size is > it ,new log content will be ignore
+        public int cacheLogMaxLength = 524288;
+
+        //日志名
+        // default log file name
+        public string logFileName = "default.log";
+
+        //日志路径
+        // default log file path
+        public string logPath = "TinyLogs";
+
+        //文件最大大小 最大10M
+        // max file length 
+        public long fileMaxLength = 10485760;
+
+        //内部错误次数，默认为3，超过该次数，日志自动降级
+        // max inner error retry count
+        public int errorRetry = 3;
+
+        //日志格式
+        // format of log
+        public string formatString = "[时间：{0}级别：{1} 日志内容]：{2}";
+
+        #region 归档部分 archive
+
+        //压缩器 your compressor
+        public ICompress comperessor = new Gzip();
+
+        //归档文件夹最大大小 默认100M
+        // max length of your archive dir ,if bigger than it ,dir will be clear 
+        public long archiveDirMaxLength = 104857600;
+
+        #endregion
+
+    }
+    #endregion
+
+    /// <summary>
+    /// tinyLog：
+    /// use case：
+    ///     component in any program
+    ///     easy to integrate
+    ///     some test scene
     ///     
-    ///     可以编译成独立组件，也可以直接集成到项目中
-    /// 支持以下特性：
+    ///     it can be used as a inpendent dll ,or integrated into your program
+    /// 
+    /// supports：
     ///     1、日志格式非常简单、所有数据存在一个文件中
     ///     2、日志文件支持分割，如果数据超过10M放到.old文件中，同时将之前的old文件删除
     ///     3、日志支持高频写入，输入暂存到内存，每1分钟刷到文件，如果内存数据量大于64KB，将触发立即灌入文件
@@ -32,7 +96,7 @@ namespace TinyLog
 
         private static bool? isOn;
         /// <summary>
-        /// 是否停掉记录日志
+        /// isStopLog
         /// </summary>
         public static bool IsOn
         {
@@ -52,7 +116,7 @@ namespace TinyLog
 
         private static bool? isArchiveOn;
         /// <summary>
-        /// 是否启用日志归档
+        /// IsArchiveOn
         /// </summary>
         public static bool IsArchiveOn
         {
@@ -74,7 +138,7 @@ namespace TinyLog
         private StringBuilder sb = new StringBuilder();
 
         /// <summary>
-        /// 查看缓存中的日志内容
+        /// get conten which cached in memory
         /// </summary>
         public string LogContent { get { return sb.ToString(); } }
 
@@ -89,18 +153,18 @@ namespace TinyLog
         private TinyLogConfig config = new TinyLogConfig();
 
 
-        //错误次数
+        //error count
         private static int errorCount = 0;
 
         private static int archiveErrorCount = 0;
 
         private string logID;
 
-        //随机因子
+        //random factor
         private static int factor = 100;
 
         /// <summary>
-        /// 日志对象ID
+        /// logid
         /// </summary>
         private string LogID
         {
@@ -114,19 +178,23 @@ namespace TinyLog
 
         public TinyLog()
         {
-            //变更区域 初始化10000
+            //10000
             sb = new StringBuilder(10000);
+        }
+
+        public TinyLog(string logName, string logFolderName=""):this() {
+            this.Init(logName, logFolderName);
         }
 
         private static TinyLog _log = new TinyLog();
 
         /// <summary>
-        /// 获取单例日志对象
+        /// get singlton instance of tinyLog
         /// </summary>
         /// <returns></returns>
         public static TinyLog GetInstance() { return _log; }
 
-        public void Init(string logName, string logFolderName)
+        public void Init(string logName, string logFolderName="")
         {
             config.logFileName = logName;
             if (string.IsNullOrEmpty(logFolderName) == false)
@@ -160,7 +228,6 @@ namespace TinyLog
 
         private void InnerWrite(string head, string info)
         {
-            //日志关闭时，不写入日志
             if (!IsOn)
                 return;
             lock (lockObj)
@@ -178,11 +245,11 @@ namespace TinyLog
                     nextRunTime = DateTime.Now;
                 }
 
-                //首次启动
+                //start when @ start time
                 if (thread == null)
                 {
                     thread = new Thread(new ThreadStart(writeSb2File));
-                    //设置为后台线程
+                    //background thread
                     thread.IsBackground = false;
                     thread.Start();
                 }
@@ -209,7 +276,7 @@ namespace TinyLog
                     }
                     catch (Exception ex)
                     {
-                        InnerWrite("innerFatal", "日志数据写入到文件错误:" + ex.ToString());
+                        InnerWrite("innerFatal", "errors when writing log data to file :" + ex.ToString());
                         innerError();
                     }
                 }
@@ -227,7 +294,7 @@ namespace TinyLog
         {
             string filePath = null;
             var strSb = "";
-            //获取文件路径
+            //get path
             if (Path.IsPathRooted(config.logPath) == false)
             {
                 filePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, config.logPath, config.logFileName);
@@ -240,10 +307,9 @@ namespace TinyLog
             {
                 Directory.CreateDirectory(Path.GetDirectoryName(filePath));
             }
-            //文件是否存在
             if (File.Exists(filePath))
             {
-                //判断旧文件大小，如果超过就存放到.old中
+                //judge file size , if bigger than config's size , save to .old 
                 FileInfo fi = new FileInfo(filePath);
                 if (fi.Length > globalConfig.fileMaxLength)
                 {
@@ -255,11 +321,11 @@ namespace TinyLog
                     if (IsArchiveOn)
                     {
                         var athread = new Thread(new ThreadStart(achive));
-                        //设置为后台线程
+                        //background
                         athread.IsBackground = true;
                         athread.Start();
                     }
-                    //重新写入到文件
+                    //write to file
                     lock (lockObj)
                     {
                         strSb = sb.ToString();
@@ -291,7 +357,7 @@ namespace TinyLog
         }
 
         /// <summary>
-        /// 归档方法
+        /// method of archive
         /// </summary>
         private void achive()
         {
@@ -300,7 +366,7 @@ namespace TinyLog
                 try
                 {
                     string filePath = null;
-                    //获取文件路径
+                    // get right path
                     if (Path.IsPathRooted(config.logPath) == false)
                     {
                         filePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, config.logPath, config.logFileName);
@@ -310,18 +376,18 @@ namespace TinyLog
                         filePath = Path.Combine(config.logPath, config.logFileName);
                     }
                     var dir = Path.Combine(Path.GetDirectoryName(filePath), "archive");
-                    //创建归档目录
+                    //create archine dir
                     if (Directory.Exists(dir) == false)
                     {
                         Directory.CreateDirectory(dir);
                     }
-                    //将当前old文件归档保存到归档库内
+                    //put .old to archive
                     var srcFile = filePath + ".old";
                     var tgtFile = Path.Combine(dir, Path.GetFileName(filePath) + ".old." + DateTime.Now.ToString("yyyyMMddHHmmss") + ".zip");
                     config.comperessor.CompressData(srcFile, tgtFile);
                     File.Delete(srcFile);
 
-                    //归档最大目录大小
+                    //if size bigger than maxDirLength ,clear archive
                     if (GetDirSize(new DirectoryInfo(dir)) > config.archiveDirMaxLength)
                     {
                         ClearDir(dir);
@@ -329,66 +395,62 @@ namespace TinyLog
                 }
                 catch (Exception ex)
                 {
-                    InnerWrite("innerFatal", "归档现场出错:" + ex.ToString());
+                    InnerWrite("innerFatal", "archive errors:" + ex.ToString());
                     innerAchiveError();
                 }
                 
             }
         }
 
-        /// <summary>
-        /// 内部错误
-        /// </summary>
         private void innerError()
         {
             errorCount++;
             if (errorCount > globalConfig.errorRetry)
             {
-                InnerWrite("innerFatal", "内部出错次数为" + errorCount + " 并已经重置");
+                InnerWrite("innerFatal", "innerErrorCount:" + errorCount + " and reset already");
                 IsOn = false;
                 errorCount = 0;
             }
         }
 
         /// <summary>
-        /// 归档的内部错误处理
+        /// error handler of archive error
         /// </summary>
         private void innerAchiveError()
         {
             archiveErrorCount++;
             if (archiveErrorCount > globalConfig.errorRetry)
             {
-                InnerWrite("innerFatal", "归档内部出错次数为" + archiveErrorCount + " 并已经重置");
+                InnerWrite("innerFatal", "innerErrorCount:" + archiveErrorCount + " and reset already");
                 IsArchiveOn = false;
                 archiveErrorCount = 0;
             }
         }
 
         /// <summary>
-        /// 获取目录文件总大小
+        /// get dir size 
         /// </summary>
         /// <param name="d"></param>
         /// <returns></returns>
         public static long GetDirSize(DirectoryInfo d)
         {
             long Size = 0;
-            // 所有文件大小.
             FileInfo[] fis = d.GetFiles();
             foreach (FileInfo fi in fis)
             {
                 Size += fi.Length;
             }
-            // 遍历出当前目录的所有文件夹.
+            // get of dir size
             DirectoryInfo[] dis = d.GetDirectories();
             foreach (DirectoryInfo di in dis)
             {
-                Size += GetDirSize(di);   //这就用到递归了，调用父方法,注意，这里并不是直接返回值，而是调用父返回来的
+                Size += GetDirSize(di);  
             }
             return (Size);
         }
 
         /// <summary>
-        /// 清空目录
+        /// clear dir
         /// </summary>
         /// <param name="srcPath"></param>
         public static void ClearDir(string srcPath)
@@ -396,17 +458,17 @@ namespace TinyLog
             try
             {
                 DirectoryInfo dir = new DirectoryInfo(srcPath);
-                FileSystemInfo[] fileinfo = dir.GetFileSystemInfos();  //返回目录中所有文件和子目录
+                FileSystemInfo[] fileinfo = dir.GetFileSystemInfos(); 
                 foreach (FileSystemInfo i in fileinfo)
                 {
-                    if (i is DirectoryInfo)            //判断是否文件夹
+                    if (i is DirectoryInfo)           
                     {
                         DirectoryInfo subdir = new DirectoryInfo(i.FullName);
-                        subdir.Delete(true);          //删除子目录和文件
+                        subdir.Delete(true);         
                     }
                     else
                     {
-                        File.Delete(i.FullName);      //删除指定文件
+                        File.Delete(i.FullName);   
                     }
                 }
             }
@@ -419,52 +481,138 @@ namespace TinyLog
     }
 
     /// <summary>
-    ///  日志配置类，外部修改配置，请在这里扩展
+    /// interface of compress
     /// </summary>
-    internal class TinyLogConfig
+    internal interface ICompress
     {
-        //是否开启日志
-        public bool isOn = true;
+        byte[] CompressData(byte[] data);
+        string CompressData(string data);
+        void CompressData(Stream inStream, Stream outStream);
+        void CompressData(string srcFile, string tgtFile);
+        void DeCompressData(string srcFile, string tgtFile);
+        void DeCompressData(Stream inStream, Stream outStream);
+        byte[] DeCompressData(byte[] data);
+        string DeCompressData(string data);
+    }
 
-        //是否开启归档
-        public bool isAchiveOn = true;
+    internal class Gzip : ICompress
+    {
+        public byte[] CompressData(byte[] data)
+        {
+            using (MemoryStream msOut = new MemoryStream())
+            {
+                GZipStream gzs = new GZipStream(msOut, CompressionMode.Compress, true);
+                gzs.Write(data, 0, data.Length);
+                gzs.Close();
+                return msOut.ToArray();
+            }
+        }
 
-        //刷新间隔 1分钟刷一次
-        public int refreshInternal = 60000;
+        public string CompressData(string data)
+        {
+            byte[] arrData = Encoding.UTF8.GetBytes(data);
+            byte[] arrCompressed = CompressData(arrData);
+            return Convert.ToBase64String(arrCompressed);
+        }
 
-        //最快落文件间隔
-        public int unitInternal = 5000;
+        public void CompressData(Stream inStream, Stream outStream)
+        {
+            using (GZipStream gzs = new GZipStream(outStream, CompressionMode.Compress, true))
+            {
+                long leftLength = inStream.Length;
+                byte[] buffer = new byte[4096];
+                int maxLength = buffer.Length;
+                int num = 0;
+                int fileStart = 0;
+                while (leftLength > 0)
+                {
+                    inStream.Position = fileStart;
+                    if (leftLength < maxLength)
+                    {
+                        num = inStream.Read(buffer, 0, Convert.ToInt32(leftLength));
+                        gzs.Write(buffer, 0, Convert.ToInt32(leftLength));
+                    }
+                    else
+                    {
+                        num = inStream.Read(buffer, 0, maxLength);
+                        gzs.Write(buffer, 0, maxLength);
+                    }
+                    if (num == 0)
+                    {
+                        break;
+                    }
+                    fileStart += num;
+                    leftLength -= num;
+                }
 
-        //日志缓存建议长度 64KB×2
-        public int cacheLogLength = 65536;
+            }
+        }
 
-        //最大缓存大小，大于这个不在记录
-        public int cacheLogMaxLength = 524288;
+        public void CompressData(string srcFile, string tgtFile)
+        {
+            if (File.Exists(srcFile) == false)
+            {
+                return;
+            }
+            if (File.Exists(tgtFile)) File.Delete(tgtFile);
 
-        //日志名
-        public string logFileName = "default.log";
+            using (FileStream fs = new FileStream(srcFile, FileMode.Open))
+            {
+                using (FileStream tfs = new FileStream(tgtFile, FileMode.OpenOrCreate))
+                {
+                    CompressData(fs, tfs);
+                }
+            }
+        }
 
-        //日志路径
-        public string logPath = "TinyLogs";
+        public void DeCompressData(string srcFile, string tgtFile)
+        {
+            if (File.Exists(srcFile) == false)
+            {
+                return;
+            }
+            if (File.Exists(tgtFile)) File.Delete(tgtFile);
+            using (FileStream fs = new FileStream(srcFile, FileMode.Open))
+            {
+                using (FileStream tfs = new FileStream(tgtFile, FileMode.OpenOrCreate))
+                {
+                    DeCompressData(fs, tfs);
+                }
+            }
+        }
 
-        //文件最大大小 最大10M
-        public long fileMaxLength = 10485760;
+        public void DeCompressData(Stream inStream, Stream outStream)
+        {
+            Stream msOut = outStream;
+            using (GZipStream gzs = new GZipStream(inStream, CompressionMode.Decompress, true))
+            {
+                var bytes = new byte[4096];
+                int count;
+                while ((count = gzs.Read(bytes, 0, bytes.Length)) != 0)
+                {
+                    msOut.Write(bytes, 0, count);
+                }
+            }
 
-        //内部错误次数，默认为3，超过该次数，日志自动降级
-        public int errorRetry = 3;
+        }
 
-        //日志格式
-        public string formatString = "[时间：{0}级别：{1} 日志内容]：{2}";
+        public byte[] DeCompressData(byte[] data)
+        {
+            using (MemoryStream ms = new MemoryStream())
+            {
+                using (MemoryStream outMs = new MemoryStream(data))
+                {
+                    DeCompressData(new MemoryStream(data), ms);
+                    return ms.ToArray();
+                }
+            }
+        }
 
-        #region 归档部分
-
-        //压缩器
-        public ICompress comperessor = new Gzip();
-
-        //归档文件夹最大大小 默认100M
-        public long archiveDirMaxLength = 104857600;
-
-        #endregion
-
+        public string DeCompressData(string data)
+        {
+            byte[] arrData = Convert.FromBase64String(data);
+            byte[] arrCompressed = DeCompressData(arrData);
+            return Encoding.UTF8.GetString(arrCompressed);
+        }
     }
 }

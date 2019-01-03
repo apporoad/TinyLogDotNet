@@ -10,12 +10,16 @@ namespace Test
     {
         static void Main(string[] args)
         {
-            TestThread();
-            Test();
-            
-
+            //TestThread();
+            //Test();
+            //TestMulti();
+            TestEasyUse();
         }
 
+        static void TestEasyUse() {
+            var tl = new TinyLog.TinyLog("tiny.log");
+            tl.Error("abc");
+        }
 
         static void Test()
         {
@@ -52,6 +56,25 @@ namespace Test
                 tl.Debug("线程" + obj + "执行第" + i + "次sdddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd");
                 Thread.Sleep(10);
             }
+        }
+
+        static void TestMulti() {
+            for (int i = 0; i < 10; i++)
+            {
+                new Thread(new ParameterizedThreadStart(mutlti)).Start(i);
+            }
+        }
+
+        static void mutlti(object obj) {
+            var logName = "test" + obj + ".log";
+            var log = new TinyLog.TinyLog();
+            log.Init(logName, "");
+            for (int i = 0; i < 1000000; i++)
+            {
+                log.Debug(logName + "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd");
+                Thread.Sleep(10);
+            }
+
         }
     }
 }
